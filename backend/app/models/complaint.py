@@ -89,6 +89,9 @@ class Complaint(db.Model):
         # Compute dynamic pending hours
         pending_hours = max(0.0, (datetime.utcnow() - self.created_at).total_seconds() / 3600.0)
 
+        latest_res = self.latest_resolution
+        resolution_data = latest_res.to_dict() if latest_res else None
+
         data = {
             'id': self.id,
             'complaint_number': self.complaint_number,
@@ -109,6 +112,7 @@ class Complaint(db.Model):
             'category': category_data,
             'student': student_data,
             'assigned_staff': assigned_staff_data,
+            'resolution': resolution_data,
             'is_supported_by_me': is_supported_by_me,
             'supports_count': self.supports.count(),
             'is_liked_by_me': is_liked_by_me,

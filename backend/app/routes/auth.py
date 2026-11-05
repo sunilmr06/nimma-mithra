@@ -53,7 +53,7 @@ def register():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """
-    Unified role-aware login for students, staff, and admins.
+    Standard login for students and staff. Admin accounts must use /admin-login.
     """
     data = request.get_json() or {}
     email = sanitize_string(data.get('email', '')).lower()
@@ -66,12 +66,47 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Unauthorized', 'message': 'Invalid email or password.'}), 401
 
+    if user.role == 'admin':
+        return jsonify({
+            'error': 'Forbidden',
+            'message': 'Administrator accounts must log in via the dedicated Admin Portal (/admin/login).'
+        }), 403
+
     if not user.is_active:
         return jsonify({'error': 'Forbidden', 'message': 'Account is deactivated. Please contact an administrator.'}), 403
 
     token = create_access_token(identity=user.id)
     return jsonify({
         'message': 'Login successful.',
+        'access_token': token,
+        'user': user.to_dict()
+    }), 200
+
+@auth_bp.route('/admin-login', methods=['POST'])
+def admin_login():
+    """
+    Dedicated login endpoint for administrators.
+    """
+    data = request.get_json() or {}
+    email = sanitize_string(data.get('email', '')).lower()
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'error': 'Validation Error', 'message': 'Email and password are required.'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.check_password(password):
+        return jsonify({'error': 'Unauthorized', 'message': 'Invalid administrator credentials.'}), 401
+
+    if user.role != 'admin':
+        return jsonify({'error': 'Forbidden', 'message': 'Access denied. This endpoint is restricted to administrators only.'}), 403
+
+    if not user.is_active:
+        return jsonify({'error': 'Forbidden', 'message': 'Administrator account deactivated.'}), 403
+
+    token = create_access_token(identity=user.id)
+    return jsonify({
+        'message': 'Admin login successful.',
         'access_token': token,
         'user': user.to_dict()
     }), 200

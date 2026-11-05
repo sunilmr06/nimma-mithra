@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { notificationService } from '../../services/notificationService';
 import { 
   ShieldCheck, 
   User as UserIcon, 
   LogOut, 
-  Sparkles, 
   ChevronDown,
   Wrench,
   GraduationCap,
@@ -15,7 +15,9 @@ import {
   MessageSquareHeart,
   LayoutDashboard,
   Menu,
-  X
+  X,
+  Bell,
+  CheckCheck
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -23,18 +25,66 @@ const Navbar = () => {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const [demoMenuOpen, setDemoMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleDemoSwitch = async (email, pass, label) => {
+  const fetchNotifications = async () => {
     try {
-      await login(email, pass);
-      toast.success(`Switched session to ${label}`);
-      setDemoMenuOpen(false);
+      const res = await notificationService.getNotifications();
+      setNotifications(res.notifications || []);
+      setUnreadCount(res.unread_count || 0);
     } catch (e) {
-      toast.error('Failed to switch demo account.');
+      console.error('Failed to load notifications:', e);
     }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 20000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const handleNotifClick = async (notif) => {
+    try {
+      if (!notif.is_read) {
+        await notificationService.markAsRead(notif.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n))
+        );
+        setUnreadCount((c) => Math.max(0, c - 1));
+      }
+      setNotifOpen(false);
+      if (notif.complaint_id) {
+        navigate(`/student/complaints/${notif.complaint_id}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+      toast.success('All notifications marked as read.');
+    } catch (e) {
+      toast.error('Failed to mark notifications as read.');
+    }
+  };
+
+  const formatTimeAgo = (dateStr) => {
+    if (!dateStr) return '';
+    const diff = (new Date() - new Date(dateStr)) / 1000;
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
   };
 
   const handleLogout = () => {
@@ -151,77 +201,78 @@ const Navbar = () => {
         </nav>
       </div>
 
-      {/* Right side: Demo Switcher + Role + Profile */}
+      {/* Right side: Notifications Bell + Role Badge + Profile */}
       <div className="flex items-center gap-3">
-        {/* Instant Demo Role Switcher */}
+        {/* Notifications Bell & Dropdown */}
         <div className="relative">
           <button
-            onClick={() => setDemoMenuOpen(!demoMenuOpen)}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-elevated border border-border hover:border-slate-500 text-main transition-colors"
-            title="Switch demo role instantly"
+            onClick={() => setNotifOpen(!notifOpen)}
+            className="relative p-2 rounded-xl bg-elevated border border-border hover:border-slate-500 text-main transition-colors"
+            title="Notifications"
           >
-            <Sparkles className="w-3.5 h-3.5 text-cyan" />
-            <span className="hidden sm:inline">Role Switcher</span>
-            <ChevronDown className="w-3.5 h-3.5 text-muted" />
+            <Bell className="w-4 h-4 text-cyan" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-[10px] font-extrabold text-white flex items-center justify-center animate-pulse">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
 
-          {demoMenuOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-elevated border border-border rounded-xl shadow-2xl p-2 z-50">
-              <p className="text-[11px] font-semibold text-muted px-2.5 py-1 uppercase tracking-wider">
-                Instant Role Switcher
-              </p>
-              <div className="flex flex-col gap-1 mt-1">
-                <button
-                  onClick={() => handleDemoSwitch('admin@campuscare.edu', 'Admin@123', 'Administrator')}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg hover:bg-card text-left transition-colors"
-                >
-                  <ShieldCheck className="w-4 h-4 text-primary-light" />
-                  <div>
-                    <p className="font-semibold text-main">Administrator</p>
-                    <p className="text-[11px] text-muted">Dr. Sarah Mitchell</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch('rajesh.electrician@campuscare.edu', 'Staff@123', 'Rajesh (Electrical Staff)')}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg hover:bg-card text-left transition-colors"
-                >
-                  <Wrench className="w-4 h-4 text-cyan" />
-                  <div>
-                    <p className="font-semibold text-main">Staff (Electrical)</p>
-                    <p className="text-[11px] text-muted">Rajesh Kumar</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch('suresh.plumber@campuscare.edu', 'Staff@123', 'Suresh (Plumber Staff)')}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg hover:bg-card text-left transition-colors"
-                >
-                  <Wrench className="w-4 h-4 text-cyan" />
-                  <div>
-                    <p className="font-semibold text-main">Staff (Plumbing)</p>
-                    <p className="text-[11px] text-muted">Suresh Sharma</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch('alex.student@campuscare.edu', 'Student@123', 'Student Alex')}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg hover:bg-card text-left transition-colors"
-                >
-                  <GraduationCap className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <p className="font-semibold text-main">Student Alex (CS)</p>
-                    <p className="text-[11px] text-muted">alex.student@campuscare.edu</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => handleDemoSwitch('priya.student@campuscare.edu', 'Student@123', 'Student Priya')}
-                  className="flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg hover:bg-card text-left transition-colors"
-                >
-                  <GraduationCap className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <p className="font-semibold text-main">Student Priya (Mech)</p>
-                    <p className="text-[11px] text-muted">priya.student@campuscare.edu</p>
-                  </div>
-                </button>
+          {notifOpen && (
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-card border border-border rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/80">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-cyan" />
+                  <span className="text-xs font-bold text-main">Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      {unreadCount} new
+                    </span>
+                  )}
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="flex items-center gap-1 text-[11px] text-cyan hover:underline font-medium"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span>Mark all read</span>
+                  </button>
+                )}
               </div>
+
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center text-muted text-xs">
+                  <Bell className="w-6 h-6 text-muted/50 mx-auto mb-2" />
+                  <span>No notifications yet</span>
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto space-y-1.5 divide-y divide-border/40">
+                  {notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      onClick={() => handleNotifClick(n)}
+                      className={`pt-2 first:pt-0 p-2 rounded-xl cursor-pointer transition-colors ${
+                        !n.is_read
+                          ? 'bg-primary/10 border-l-2 border-cyan text-main'
+                          : 'hover:bg-elevated/60 text-muted'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className={`text-xs font-semibold ${!n.is_read ? 'text-cyan-light' : 'text-main'}`}>
+                          {n.title}
+                        </h4>
+                        <span className="text-[10px] text-muted shrink-0">
+                          {formatTimeAgo(n.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted mt-0.5 line-clamp-2 leading-relaxed">
+                        {n.message}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

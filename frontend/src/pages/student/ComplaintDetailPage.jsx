@@ -202,6 +202,25 @@ const ComplaintDetailPage = () => {
               Resolved by <strong className="text-main">{complaint.resolution.staff_name}</strong> on{' '}
               {new Date(complaint.resolution.resolved_at).toLocaleString()}
             </p>
+            {complaint.resolution.cost_amount > 0 && (
+              <div className="pt-2 border-t border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted">Repair / Material Cost:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-amber-300">
+                    ₹{Number(complaint.resolution.cost_amount).toFixed(2)}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                    complaint.resolution.cost_status === 'approved'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : complaint.resolution.cost_status === 'rejected'
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {complaint.resolution.cost_status === 'approved' ? 'Cost Approved by Admin' : complaint.resolution.cost_status === 'rejected' ? 'Cost Rejected' : 'Pending Admin Approval'}
+                  </span>
+                </div>
+              </div>
+            )}
             {complaint.resolution.image_url && (
               <div className="pt-2">
                 <img

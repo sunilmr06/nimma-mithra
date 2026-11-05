@@ -30,6 +30,10 @@ export const adminService = {
     return api.patch(`/admin/complaints/${id}/reopen`, { remarks });
   },
 
+  approveCost: async (id, approved = true, remarks = '') => {
+    return api.patch(`/admin/complaints/${id}/approve-cost`, { approved, remarks });
+  },
+
   getStaffList: async () => {
     return api.get('/admin/staff');
   },

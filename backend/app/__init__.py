@@ -43,6 +43,7 @@ def create_app(config_class=Config):
     from app.routes.staff import staff_bp
     from app.routes.analytics import analytics_bp
     from app.routes.campus import campus_bp
+    from app.routes.notifications import notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(complaints_bp)
@@ -50,6 +51,7 @@ def create_app(config_class=Config):
     app.register_blueprint(staff_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(campus_bp)
+    app.register_blueprint(notifications_bp)
 
     # Error handlers
     @app.errorhandler(404)

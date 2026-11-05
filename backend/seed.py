@@ -354,6 +354,11 @@ def seed_database():
             staff_id=staff_furn.id,
             resolution_notes="Replaced defective caster wheels and hydraulic cylinder with heavy-duty replacement parts. Tested and restored to service.",
             image_url=None,
+            cost_amount=850.00,
+            is_cost_approved=True,
+            cost_status='approved',
+            cost_approved_by=admin.id,
+            cost_approved_at=c4_time + timedelta(hours=20),
             resolved_at=c4_time + timedelta(hours=18)
         )
         db.session.add(res4)
@@ -414,6 +419,41 @@ def seed_database():
             created_at=c4_time + timedelta(hours=22)
         )
         db.session.add_all([fb1, fb2])
+
+        # Seed sample notifications
+        n1 = Notification(
+            user_id=student_alex.id,
+            complaint_id=c4.id,
+            title="Issue Resolved!",
+            message="Complaint #CC-2026-0004 'Broken wheel and hydraulic lift on study carrel chair #12' has been resolved by Vikram Singh.",
+            is_read=False,
+            created_at=c4_time + timedelta(hours=18)
+        )
+        n2 = Notification(
+            user_id=admin.id,
+            complaint_id=c4.id,
+            title="Issue Resolved - Cost Approved",
+            message="Staff Vikram Singh resolved #CC-2026-0004 with repair cost ₹850.00.",
+            is_read=False,
+            created_at=c4_time + timedelta(hours=19)
+        )
+        n3 = Notification(
+            user_id=admin.id,
+            complaint_id=c1.id,
+            title="High Priority Complaint Reported",
+            message="New complaint #CC-2026-0001 'Ceiling fan making loud grinding noise' requires staff assignment.",
+            is_read=False,
+            created_at=c1_time
+        )
+        n4 = Notification(
+            user_id=staff_elec.id,
+            complaint_id=c3.id,
+            title="Emergency Task Assigned",
+            message="You have been assigned to #CC-2026-0003 'Sparks and burning odor from main distribution box'.",
+            is_read=False,
+            created_at=c3_time + timedelta(minutes=30)
+        )
+        db.session.add_all([n1, n2, n3, n4])
 
         db.session.commit()
         print("Database seeded successfully with Demo Scenario data!")

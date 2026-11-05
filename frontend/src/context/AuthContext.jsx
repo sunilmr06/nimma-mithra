@@ -43,6 +43,15 @@ export const AuthProvider = ({ children }) => {
     return res.user;
   };
 
+  const adminLogin = async (email, password) => {
+    const res = await authService.adminLogin(email, password);
+    setToken(res.access_token);
+    setUser(res.user);
+    localStorage.setItem('campuscare_token', res.access_token);
+    localStorage.setItem('campuscare_user', JSON.stringify(res.user));
+    return res.user;
+  };
+
   const register = async (userData) => {
     const res = await authService.register(userData);
     setToken(res.access_token);
@@ -74,6 +83,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token && !!user,
         loading,
         login,
+        adminLogin,
         register,
         updateUser,
         logout,

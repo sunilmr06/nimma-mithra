@@ -16,7 +16,10 @@ import {
   Eye, 
   Wrench, 
   Flame,
-  AlertTriangle
+  AlertTriangle,
+  Receipt,
+  Check,
+  XCircle
 } from 'lucide-react';
 
 const AdminComplaintsPage = () => {
@@ -37,6 +40,7 @@ const AdminComplaintsPage = () => {
   const [assignModal, setAssignModal] = useState({ open: false, complaint: null, staffId: '', remarks: '' });
   const [severityModal, setSeverityModal] = useState({ open: false, complaint: null, severity: 3 });
   const [reopenModal, setReopenModal] = useState({ open: false, complaint: null, remarks: '' });
+  const [costModal, setCostModal] = useState({ open: false, complaint: null, resolution: null, remarks: '' });
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchComplaints = async () => {
@@ -134,6 +138,22 @@ const AdminComplaintsPage = () => {
     }
   };
 
+  // Submit Cost Review (Approve or Reject)
+  const handleCostSubmit = async (approved) => {
+    if (!costModal.complaint) return;
+    setActionLoading(true);
+    try {
+      await adminService.approveCost(costModal.complaint.id, approved, costModal.remarks);
+      toast.success(`Resolution cost ${approved ? 'approved' : 'rejected'} successfully.`);
+      setCostModal({ open: false, complaint: null, resolution: null, remarks: '' });
+      fetchComplaints();
+    } catch (err) {
+      toast.error(err.message || 'Failed to review cost.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const filtered = complaints.filter((c) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -212,95 +232,111 @@ const AdminComplaintsPage = () => {
         </div>
       </Card>
 
-      {/* Table Container */}
+      {/* Table Container - Simplified Issue Queue */}
       <Card className="p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-elevated/70 border-b border-border text-muted uppercase font-bold text-[10px] tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Complaint</th>
-                <th className="py-3.5 px-4">Location & Category</th>
-                <th className="py-3.5 px-4">Priority (Score)</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Assigned Staff</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4">Issue Date</th>
+                <th className="py-3.5 px-4">Priority</th>
+                <th className="py-3.5 px-4">Issue Maker Name</th>
+                <th className="py-3.5 px-4">Date & Time</th>
+                <th className="py-3.5 px-4 text-right">Cost & Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">
+                  <td colSpan={5} className="py-8 text-center text-muted">
                     Loading complaints...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted">
+                  <td colSpan={5} className="py-8 text-center text-muted">
                     No complaints matching the selected filters.
                   </td>
                 </tr>
               ) : (
                 filtered.map((c) => (
                   <tr key={c.id} className="hover:bg-elevated/30 transition-colors">
-                    {/* Complaint ID & Title */}
-                    <td className="py-3 px-4 max-w-xs">
-                      <span className="font-mono text-[11px] font-bold text-muted block">
+                    {/* 1. Issue Date */}
+                    <td className="py-3 px-4 font-semibold text-main whitespace-nowrap">
+                      <span className="block font-medium">
+                        {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted">
                         #{c.complaint_number}
                       </span>
-                      <span className="font-semibold text-main line-clamp-1 block hover:text-cyan cursor-pointer"
-                        onClick={() => navigate(`/student/complaints/${c.id}`)}>
-                        {c.title}
-                      </span>
-                      <span className="text-[11px] text-muted">
-                        by {c.student?.name || 'Student'} • {c.affected_users_count} affected
-                      </span>
                     </td>
 
-                    {/* Location & Category */}
+                    {/* 2. Priority */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="text-main block">{c.room?.location_display}</span>
-                      <span className="text-[11px] text-primary-light font-medium block">
-                        {c.category?.name}
-                      </span>
-                    </td>
-
-                    {/* Priority & Severity */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <PriorityBadge level={c.priority_level} score={c.priority_score} />
                         <button
                           onClick={() => setSeverityModal({ open: true, complaint: c, severity: c.severity })}
                           className="p-1 hover:bg-elevated rounded text-muted hover:text-warning"
                           title="Adjust Severity"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
+                          <Edit3 className="w-3 h-3" />
                         </button>
                       </div>
                       <span className="text-[10px] text-muted block mt-0.5">
-                        Severity {c.severity}/5 • Pending {c.pending_hours}h
+                        Pending {c.pending_hours}h
                       </span>
                     </td>
 
-                    {/* Status */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <StatusBadge status={c.status} />
+                    {/* 3. Issue Maker Name */}
+                    <td className="py-3 px-4">
+                      <span className="font-semibold text-main block hover:text-cyan cursor-pointer"
+                        onClick={() => navigate(`/student/complaints/${c.id}`)}>
+                        {c.student?.name || 'Anonymous Student'}
+                      </span>
+                      <span className="text-[11px] text-muted line-clamp-1">
+                        {c.title} • {c.student?.department || c.room?.location_display}
+                      </span>
                     </td>
 
-                    {/* Assigned Staff */}
+                    {/* 4. Date & Time */}
                     <td className="py-3 px-4 whitespace-nowrap">
-                      {c.assigned_staff ? (
-                        <div className="flex items-center gap-1.5 text-main font-medium">
-                          <Wrench className="w-3.5 h-3.5 text-cyan" />
-                          <span>{c.assigned_staff.name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted italic">Unassigned</span>
-                      )}
+                      <span className="text-main font-medium block">
+                        {c.created_at ? new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </span>
+                      <div className="mt-0.5">
+                        <StatusBadge status={c.status} />
+                      </div>
                     </td>
 
-                    {/* Actions */}
+                    {/* 5. Cost & Action */}
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* Cost Approval Button (for resolved complaints with cost) */}
+                        {c.status === 'resolved' && c.resolution && (
+                          (c.resolution.cost_status === 'pending' || !c.resolution.is_cost_approved) ? (
+                            <Button
+                              size="sm"
+                              variant="warning"
+                              icon={Receipt}
+                              onClick={() => setCostModal({ open: true, complaint: c, resolution: c.resolution, remarks: '' })}
+                              className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 font-semibold"
+                            >
+                              Review Cost (₹{c.resolution.cost_amount})
+                            </Button>
+                          ) : c.resolution.cost_status === 'approved' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              <CheckCircle className="w-3 h-3" />
+                              ₹{c.resolution.cost_amount} Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                              <AlertTriangle className="w-3 h-3" />
+                              Cost Rejected
+                            </span>
+                          )
+                        )}
+
                         {/* Acknowledge (if submitted) */}
                         {c.status === 'submitted' && (
                           <Button
@@ -495,6 +531,79 @@ const AdminComplaintsPage = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Cost Review & Approval Modal */}
+      <Modal
+        isOpen={costModal.open}
+        onClose={() => setCostModal({ open: false, complaint: null, resolution: null, remarks: '' })}
+        title={`Review Resolution Cost — #${costModal.complaint?.complaint_number}`}
+        subtitle="Review repair and material expenses submitted by maintenance technician."
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-card border border-border space-y-2 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="text-muted">Issue:</span>
+              <span className="font-semibold text-main line-clamp-1">{costModal.complaint?.title}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted">Completed By:</span>
+              <span className="font-semibold text-cyan">{costModal.resolution?.staff_name || 'Staff Technician'}</span>
+            </div>
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-muted shrink-0">Technician Notes:</span>
+              <span className="text-main max-w-xs text-right line-clamp-2">{costModal.resolution?.resolution_notes}</span>
+            </div>
+            <div className="pt-2 border-t border-border flex justify-between items-center">
+              <span className="text-xs font-bold text-muted">Submitted Cost:</span>
+              <span className="text-xl font-black text-amber-300">
+                ₹{costModal.resolution?.cost_amount ? Number(costModal.resolution.cost_amount).toFixed(2) : '0.00'}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-1.5">
+              Admin Review Remarks (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={costModal.remarks}
+              onChange={(e) => setCostModal((prev) => ({ ...prev, remarks: e.target.value }))}
+              placeholder="e.g. Invoices verified, parts replaced match campus maintenance budget."
+              className="w-full bg-card border border-border rounded-xl p-2.5 text-xs text-main placeholder-muted focus:outline-none focus:border-primary resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCostModal({ open: false, complaint: null, resolution: null, remarks: '' })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              icon={XCircle}
+              loading={actionLoading}
+              onClick={() => handleCostSubmit(false)}
+            >
+              Reject Cost
+            </Button>
+            <Button
+              variant="cyan"
+              size="sm"
+              icon={Check}
+              loading={actionLoading}
+              onClick={() => handleCostSubmit(true)}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+            >
+              Approve Cost
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

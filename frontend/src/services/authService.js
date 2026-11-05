@@ -5,6 +5,10 @@ export const authService = {
     return api.post('/auth/login', { email, password });
   },
 
+  adminLogin: async (email, password) => {
+    return api.post('/auth/admin-login', { email, password });
+  },
+
   register: async (userData) => {
     return api.post('/auth/register', userData);
   },

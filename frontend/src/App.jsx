@@ -8,6 +8,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
+import AdminLoginPage from './pages/auth/AdminLoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -88,6 +89,7 @@ function App() {
           <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
             {/* Root Route */}

@@ -5,6 +5,7 @@ import { complaintService } from '../../services/complaintService';
 import StatCard from '../../components/common/StatCard';
 import ComplaintCard from '../../components/complaints/ComplaintCard';
 import Button from '../../components/common/Button';
+import NotificationsWidget from '../../components/common/NotificationsWidget';
 import { 
   FileText, 
   Clock, 
@@ -98,6 +99,9 @@ const StudentDashboard = () => {
           subtext="Restored and verified"
         />
       </div>
+
+      {/* Notifications Widget */}
+      <NotificationsWidget limit={3} />
 
       {/* Recent Complaints Section */}
       <div className="space-y-4">

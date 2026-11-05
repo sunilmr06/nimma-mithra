@@ -37,9 +37,15 @@ class ComplaintResolution(db.Model):
     staff_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     resolution_notes = db.Column(db.Text, nullable=False)
     image_url = db.Column(db.Text, nullable=True)
+    cost_amount = db.Column(db.Float, default=0.0, nullable=True)
+    is_cost_approved = db.Column(db.Boolean, default=False)
+    cost_status = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'rejected'
+    cost_approved_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
+    cost_approved_at = db.Column(db.DateTime, nullable=True)
     resolved_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     staff = db.relationship('User', foreign_keys=[staff_id])
+    approver = db.relationship('User', foreign_keys=[cost_approved_by])
 
     def to_dict(self):
         return {
@@ -49,6 +55,12 @@ class ComplaintResolution(db.Model):
             'staff_name': self.staff.name if self.staff else None,
             'resolution_notes': self.resolution_notes,
             'image_url': self.image_url,
+            'cost_amount': float(self.cost_amount) if self.cost_amount is not None else 0.0,
+            'is_cost_approved': bool(self.is_cost_approved),
+            'cost_status': self.cost_status or ('approved' if self.is_cost_approved else 'pending'),
+            'cost_approved_by': self.cost_approved_by,
+            'cost_approved_by_name': self.approver.name if self.approver else None,
+            'cost_approved_at': self.cost_approved_at.isoformat() if self.cost_approved_at else None,
             'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None
         }
 

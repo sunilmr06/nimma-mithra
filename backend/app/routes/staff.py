@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
 from app.extensions import db
+from app.models.user import User
 from app.models.complaint import Complaint
 from app.models.assignment import ComplaintAssignment
 from app.models.history import ComplaintStatusHistory, ComplaintResolution, Notification
@@ -126,12 +127,21 @@ def submit_resolution(id):
     if not resolution_notes:
         return jsonify({'error': 'Validation Error', 'message': 'Resolution notes are required.'}), 400
 
+    cost_raw = data.get('cost_amount') or data.get('cost') or 0.0
+    try:
+        cost_amount = float(cost_raw) if cost_raw is not None and str(cost_raw).strip() != '' else 0.0
+    except (ValueError, TypeError):
+        cost_amount = 0.0
+
     # Create resolution record
     resolution = ComplaintResolution(
         complaint_id=complaint.id,
         staff_id=current_staff.id,
         resolution_notes=resolution_notes,
         image_url=image_url,
+        cost_amount=cost_amount,
+        is_cost_approved=False if cost_amount > 0 else True,
+        cost_status='pending' if cost_amount > 0 else 'approved',
         resolved_at=datetime.utcnow()
     )
     db.session.add(resolution)
@@ -148,18 +158,31 @@ def submit_resolution(id):
         old_status=old_status,
         new_status='resolved',
         updated_by=current_staff.id,
-        remarks=f"Resolved by {current_staff.name}. Notes: {resolution_notes}"
+        remarks=f"Resolved by {current_staff.name}. Notes: {resolution_notes}. Submitted Cost: ₹{cost_amount:.2f}"
     )
     db.session.add(history)
 
-    # Notify student
-    notif = Notification(
+    # 1. Notify the student who raised the complaint
+    student_notif = Notification(
         user_id=complaint.student_id,
         complaint_id=complaint.id,
         title="Issue Resolved!",
-        message=f"Complaint #{complaint.complaint_number} has been resolved by {current_staff.name}."
+        message=f"Complaint #{complaint.complaint_number} '{complaint.title}' has been resolved by {current_staff.name}."
     )
-    db.session.add(notif)
+    db.session.add(student_notif)
+
+    # 2. Notify all active administrators for review and cost approval
+    admins = User.query.filter_by(role='admin', is_active=True).all()
+    cost_str = f" with submitted repair cost of ₹{cost_amount:.2f} (pending approval)" if cost_amount > 0 else ""
+    for admin_user in admins:
+        admin_notif = Notification(
+            user_id=admin_user.id,
+            complaint_id=complaint.id,
+            title="Issue Resolved - Cost Review",
+            message=f"Staff {current_staff.name} resolved #{complaint.complaint_number} '{complaint.title}'{cost_str}."
+        )
+        db.session.add(admin_notif)
+
     db.session.commit()
 
     return jsonify({

@@ -4,6 +4,7 @@ import { adminService } from '../../services/adminService';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import NotificationsWidget from '../../components/common/NotificationsWidget';
 import { StatusBadge, PriorityBadge } from '../../components/common/Badge';
 import StatusDonutChart from '../../components/charts/StatusDonutChart';
 import CategoryBarChart from '../../components/charts/CategoryBarChart';
@@ -145,12 +146,15 @@ const AdminDashboard = () => {
         )}
       </div>
 
-      {/* High Priority Queue Preview */}
+      {/* Notifications Widget in Admin Dashboard */}
+      <NotificationsWidget limit={4} />
+
+      {/* Simplified Priority Issue Queue */}
       <Card className="space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border/60">
           <div>
-            <h3 className="text-base font-bold text-main">Intelligent Priority Queue (Top Urgent)</h3>
-            <p className="text-xs text-muted">Complaints ranked dynamically by Severity, Affected Users, and Pending Time</p>
+            <h3 className="text-base font-bold text-main">Priority Issue Queue</h3>
+            <p className="text-xs text-muted">Clean view of active campus maintenance reports requiring attention</p>
           </div>
           <Button
             variant="ghost"
@@ -158,42 +162,53 @@ const AdminDashboard = () => {
             onClick={() => navigate('/admin/complaints')}
             className="text-xs text-cyan"
           >
-            <span>View All</span>
+            <span>Manage All Complaints</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Button>
         </div>
 
         {priorityQueue.length === 0 ? (
-          <p className="text-xs text-muted py-4 text-center">No active complaints pending in priority queue.</p>
+          <p className="text-xs text-muted py-6 text-center">No active complaints pending in priority queue.</p>
         ) : (
-          <div className="divide-y divide-border/60">
-            {priorityQueue.map((c) => (
-              <div
-                key={c.id}
-                onClick={() => navigate(`/student/complaints/${c.id}`)}
-                className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-elevated/40 p-2 rounded-xl cursor-pointer transition-colors"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-muted">#{c.complaint_number}</span>
-                    <h4 className="text-sm font-semibold text-main hover:text-cyan transition-colors">
-                      {c.title}
-                    </h4>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-                    <span>{c.room?.location_display}</span>
-                    <span>• {c.category?.name}</span>
-                    <span>• {c.affected_users_count} student(s) affected</span>
-                    <span>• Pending {c.pending_hours} hrs</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <PriorityBadge level={c.priority_level} score={c.priority_score} />
-                  <StatusBadge status={c.status} />
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border/80 text-[11px] font-bold text-muted uppercase tracking-wider">
+                  <th className="py-2.5 px-3">Issue Date</th>
+                  <th className="py-2.5 px-3">Priority</th>
+                  <th className="py-2.5 px-3">Issue Maker Name</th>
+                  <th className="py-2.5 px-3">Date & Time</th>
+                  <th className="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50 text-xs">
+                {priorityQueue.map((c) => (
+                  <tr key={c.id} className="hover:bg-elevated/40 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-main whitespace-nowrap">
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
+                    </td>
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <PriorityBadge level={c.priority_level} score={c.priority_score} />
+                    </td>
+                    <td className="py-3 px-3 text-main font-medium">
+                      <span>{c.student?.name || 'Anonymous Student'}</span>
+                      <span className="block text-[11px] text-muted">{c.student?.department || c.room?.location_display}</span>
+                    </td>
+                    <td className="py-3 px-3 text-muted whitespace-nowrap">
+                      {c.created_at ? new Date(c.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                    </td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => navigate(`/student/complaints/${c.id}`)}
+                        className="px-2.5 py-1 rounded-lg bg-card hover:bg-primary/20 text-cyan text-xs font-semibold border border-border"
+                      >
+                        Inspect
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>

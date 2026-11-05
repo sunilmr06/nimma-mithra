@@ -29,18 +29,32 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertEqual(data.get('application'), 'CampusCare')
 
     def test_02_auth_login_roles(self):
-        # Admin login
-        res = self.client.post('/api/v1/auth/login', json={
+        # Admin attempting login via standard student/staff login must be rejected
+        res_blocked = self.client.post('/api/v1/auth/login', json={
             'email': 'admin@campuscare.edu',
             'password': 'Admin@123'
         })
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
+        self.assertEqual(res_blocked.status_code, 403)
+        self.assertIn('Admin Portal', res_blocked.get_json()['message'])
+
+        # Dedicated Admin login endpoint succeeds
+        res_admin = self.client.post('/api/v1/auth/admin-login', json={
+            'email': 'admin@campuscare.edu',
+            'password': 'Admin@123'
+        })
+        self.assertEqual(res_admin.status_code, 200)
+        data = res_admin.get_json()
         self.assertIn('access_token', data)
         self.assertEqual(data['user']['role'], 'admin')
-        admin_token = data['access_token']
 
-        # Student login
+        # Non-admin attempting admin-login endpoint must be rejected
+        res_stud_admin = self.client.post('/api/v1/auth/admin-login', json={
+            'email': 'alex.student@campuscare.edu',
+            'password': 'Student@123'
+        })
+        self.assertEqual(res_stud_admin.status_code, 403)
+
+        # Student login via standard endpoint
         res_stud = self.client.post('/api/v1/auth/login', json={
             'email': 'alex.student@campuscare.edu',
             'password': 'Student@123'
@@ -48,7 +62,7 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertEqual(res_stud.status_code, 200)
         self.assertEqual(res_stud.get_json()['user']['role'], 'student')
 
-        # Staff login
+        # Staff login via standard endpoint
         res_staff = self.client.post('/api/v1/auth/login', json={
             'email': 'suresh.plumber@campuscare.edu',
             'password': 'Staff@123'
@@ -154,8 +168,8 @@ class CampusCareE2ETestCase(unittest.TestCase):
             self.assertEqual(dups[0].similar_complaint.complaint_number, 'CC-2026-0001')
 
     def test_07_admin_acknowledgement_and_assignment(self):
-        # Login as Admin
-        admin_login = self.client.post('/api/v1/auth/login', json={
+        # Login as Admin via dedicated admin endpoint
+        admin_login = self.client.post('/api/v1/auth/admin-login', json={
             'email': 'admin@campuscare.edu',
             'password': 'Admin@123'
         })
@@ -204,16 +218,19 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertEqual(status_res.status_code, 200)
         self.assertEqual(status_res.get_json()['task']['status'], 'in_progress')
 
-        # Staff marks resolved with notes
+        # Staff marks resolved with notes and cost
         resolve_res = self.client.post(f'/api/v1/staff/tasks/{c2_id}/resolution', headers=headers, json={
-            'resolution_notes': 'Drain line cleared, pressurized pipe tested, no further water leakage detected.'
+            'resolution_notes': 'Drain line cleared, pressurized pipe tested, no further water leakage detected.',
+            'cost_amount': 550.0
         })
         self.assertEqual(resolve_res.status_code, 200)
         self.assertEqual(resolve_res.get_json()['task']['status'], 'resolved')
         self.assertIsNotNone(resolve_res.get_json()['task']['resolved_at'])
+        self.assertEqual(resolve_res.get_json()['resolution']['cost_amount'], 550.0)
+        self.assertEqual(resolve_res.get_json()['resolution']['cost_status'], 'pending')
 
     def test_09_analytics_endpoints(self):
-        admin_login = self.client.post('/api/v1/auth/login', json={
+        admin_login = self.client.post('/api/v1/auth/admin-login', json={
             'email': 'admin@campuscare.edu',
             'password': 'Admin@123'
         })
@@ -243,7 +260,7 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
 
     def test_10_admin_reopen_complaint(self):
-        admin_login = self.client.post('/api/v1/auth/login', json={
+        admin_login = self.client.post('/api/v1/auth/admin-login', json={
             'email': 'admin@campuscare.edu',
             'password': 'Admin@123'
         })
@@ -361,6 +378,57 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertTrue(len(feed_items) > 0)
         self.assertIn('likes_count', feed_items[0])
         self.assertIn('comments_count', feed_items[0])
+
+    def test_15_notifications_and_cost_approval(self):
+        # 1. Admin logs in via admin endpoint
+        admin_login = self.client.post('/api/v1/auth/admin-login', json={
+            'email': 'admin@campuscare.edu',
+            'password': 'Admin@123'
+        })
+        admin_token = admin_login.get_json()['access_token']
+        admin_headers = {'Authorization': f'Bearer {admin_token}'}
+
+        # 2. Check admin notifications (should have notification from staff resolution)
+        notif_res = self.client.get('/api/v1/notifications', headers=admin_headers)
+        self.assertEqual(notif_res.status_code, 200)
+        self.assertTrue(len(notif_res.get_json()['notifications']) > 0)
+        first_notif = notif_res.get_json()['notifications'][0]
+
+        # 3. Mark single notification as read
+        mark_read = self.client.patch(f'/api/v1/notifications/{first_notif["id"]}/read', headers=admin_headers)
+        self.assertEqual(mark_read.status_code, 200)
+
+        # 4. Mark all notifications as read
+        mark_all = self.client.patch('/api/v1/notifications/read-all', headers=admin_headers)
+        self.assertEqual(mark_all.status_code, 200)
+        self.assertEqual(mark_all.get_json()['unread_count'], 0)
+
+        # 5. Admin approves cost for resolved complaint (c2 was resolved in test_08 with cost 550.0)
+        with self.app.app_context():
+            c2 = Complaint.query.filter_by(complaint_number='CC-2026-0002').first()
+            c2_id = c2.id
+
+        cost_approve_res = self.client.patch(f'/api/v1/admin/complaints/{c2_id}/approve-cost', headers=admin_headers, json={
+            'approved': True,
+            'remarks': 'Approved pipe repair material expenses.'
+        })
+        self.assertEqual(cost_approve_res.status_code, 200)
+        res_data = cost_approve_res.get_json()['resolution']
+        self.assertTrue(res_data['is_cost_approved'])
+        self.assertEqual(res_data['cost_status'], 'approved')
+        self.assertEqual(res_data['cost_amount'], 550.0)
+
+        # 6. Verify staff received notification about cost approval
+        staff_login = self.client.post('/api/v1/auth/login', json={
+            'email': 'suresh.plumber@campuscare.edu',
+            'password': 'Staff@123'
+        })
+        staff_token = staff_login.get_json()['access_token']
+        staff_headers = {'Authorization': f'Bearer {staff_token}'}
+
+        staff_notifs = self.client.get('/api/v1/notifications', headers=staff_headers)
+        self.assertEqual(staff_notifs.status_code, 200)
+        self.assertTrue(any('Cost Approved' in n['title'] or 'Approved' in n['title'] for n in staff_notifs.get_json()['notifications']))
 
 if __name__ == '__main__':
     unittest.main()

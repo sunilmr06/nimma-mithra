@@ -180,6 +180,53 @@ def reopen_complaint(id):
         'complaint': complaint.to_dict()
     }), 200
 
+@admin_bp.route('/complaints/<id>/approve-cost', methods=['PATCH'])
+@role_required('admin')
+def review_resolution_cost(id):
+    complaint = Complaint.query.get(id)
+    if not complaint:
+        return jsonify({'error': 'Not Found', 'message': 'Complaint not found.'}), 404
+
+    resolution = complaint.latest_resolution
+    if not resolution:
+        return jsonify({'error': 'Bad Request', 'message': 'No resolution record found for this complaint.'}), 400
+
+    data = request.get_json() or {}
+    approved = data.get('approved', True)
+    remarks = sanitize_string(data.get('remarks', ''))
+
+    resolution.is_cost_approved = bool(approved)
+    resolution.cost_status = 'approved' if approved else 'rejected'
+    resolution.cost_approved_by = g.current_user.id
+    resolution.cost_approved_at = datetime.utcnow()
+
+    # Create history entry
+    status_str = "approved" if approved else "rejected"
+    history = ComplaintStatusHistory(
+        complaint_id=complaint.id,
+        old_status=complaint.status,
+        new_status=complaint.status,
+        updated_by=g.current_user.id,
+        remarks=f"Resolution cost of ₹{resolution.cost_amount:.2f} {status_str} by Administrator {g.current_user.name}. {remarks}".strip()
+    )
+    db.session.add(history)
+
+    # Notify staff who resolved it
+    notif = Notification(
+        user_id=resolution.staff_id,
+        complaint_id=complaint.id,
+        title=f"Repair Cost {status_str.title()}",
+        message=f"Administrator {g.current_user.name} has {status_str} your submitted cost of ₹{resolution.cost_amount:.2f} for #{complaint.complaint_number}."
+    )
+    db.session.add(notif)
+    db.session.commit()
+
+    return jsonify({
+        'message': f'Resolution cost {status_str} successfully.',
+        'complaint': complaint.to_dict(include_details=True),
+        'resolution': resolution.to_dict()
+    }), 200
+
 @admin_bp.route('/staff', methods=['GET'])
 @role_required('admin')
 def get_staff_list():

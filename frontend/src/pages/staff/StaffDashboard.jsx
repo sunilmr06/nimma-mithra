@@ -7,6 +7,7 @@ import Card from '../../components/common/Card';
 import StatCard from '../../components/common/StatCard';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
+import NotificationsWidget from '../../components/common/NotificationsWidget';
 import { StatusBadge, PriorityBadge } from '../../components/common/Badge';
 import { 
   Wrench, 
@@ -37,6 +38,7 @@ const StaffDashboard = () => {
     open: false,
     task: null,
     notes: '',
+    cost: '',
     imageFile: null,
     imagePreview: null,
   });
@@ -96,13 +98,14 @@ const StaffDashboard = () => {
     try {
       const formData = new FormData();
       formData.append('resolution_notes', resolveModal.notes.trim());
+      formData.append('cost_amount', resolveModal.cost || '0');
       if (resolveModal.imageFile) {
         formData.append('photograph', resolveModal.imageFile);
       }
 
       await staffService.submitResolution(resolveModal.task.id, formData);
-      toast.success('Issue marked as resolved! Student notified.');
-      setResolveModal({ open: false, task: null, notes: '', imageFile: null, imagePreview: null });
+      toast.success('Issue marked as resolved! Student and administrators notified.');
+      setResolveModal({ open: false, task: null, notes: '', cost: '', imageFile: null, imagePreview: null });
       fetchTasks();
     } catch (err) {
       toast.error(err.message || 'Failed to resolve task.');
@@ -173,6 +176,9 @@ const StaffDashboard = () => {
           subtext="Resolved & documented"
         />
       </div>
+
+      {/* Notifications Widget for Staff */}
+      <NotificationsWidget limit={3} />
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-border/80 pb-3 overflow-x-auto text-xs">
@@ -305,6 +311,7 @@ const StaffDashboard = () => {
                           open: true,
                           task: t,
                           notes: '',
+                          cost: '',
                           imageFile: null,
                           imagePreview: null,
                         })
@@ -315,9 +322,22 @@ const StaffDashboard = () => {
                   )}
 
                   {t.status === 'resolved' && (
-                    <span className="text-xs text-success font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" /> Resolved
-                    </span>
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5">
+                      {t.resolution && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          t.resolution.cost_status === 'approved'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            : t.resolution.cost_status === 'rejected'
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                        }`}>
+                          Cost: ₹{t.resolution.cost_amount ? Number(t.resolution.cost_amount).toFixed(2) : '0.00'} ({t.resolution.cost_status === 'approved' ? 'Approved' : t.resolution.cost_status === 'rejected' ? 'Rejected' : 'Pending Review'})
+                        </span>
+                      )}
+                      <span className="text-xs text-success font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Resolved
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -330,10 +350,10 @@ const StaffDashboard = () => {
       <Modal
         isOpen={resolveModal.open}
         onClose={() =>
-          setResolveModal({ open: false, task: null, notes: '', imageFile: null, imagePreview: null })
+          setResolveModal({ open: false, task: null, notes: '', cost: '', imageFile: null, imagePreview: null })
         }
         title={`Complete & Resolve — #${resolveModal.task?.complaint_number}`}
-        subtitle="Document your maintenance repair notes and optional completion photo."
+        subtitle="Document your maintenance repair notes, repair expenses, and completion photo."
       >
         <form onSubmit={handleResolutionSubmit} className="space-y-4">
           <div>
@@ -341,13 +361,34 @@ const StaffDashboard = () => {
               Resolution Notes *
             </label>
             <textarea
-              rows={4}
+              rows={3}
               required
               value={resolveModal.notes}
               onChange={(e) => setResolveModal({ ...resolveModal, notes: e.target.value })}
               placeholder="Describe repairs performed, parts replaced, and testing conducted..."
-              className="w-full bg-card border border-border rounded-xl p-3 text-xs text-main placeholder-muted focus:outline-none focus:border-primary resize-none"
+              className="w-full bg-card border border-border rounded-xl p-3 text-xs text-main placeholder-muted focus:outline-none focus:border-cyan resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted mb-1.5">
+              Repair & Material Cost (₹) *
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-muted text-xs font-bold pointer-events-none">
+                ₹
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 450.00 (enter 0 if no parts purchased)"
+                value={resolveModal.cost}
+                onChange={(e) => setResolveModal({ ...resolveModal, cost: e.target.value })}
+                className="w-full bg-card border border-border rounded-xl pl-8 pr-3.5 py-2.5 text-xs text-main placeholder-muted focus:outline-none focus:border-cyan"
+              />
+            </div>
+            <p className="text-[11px] text-muted mt-1">Submitted costs will be sent to the campus administrator for verification and approval.</p>
           </div>
 
           <div>
