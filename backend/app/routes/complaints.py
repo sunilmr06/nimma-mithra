@@ -2,7 +2,14 @@ import os
 from datetime import datetime
 from flask import Blueprint, request, jsonify, g
 from app.extensions import db
-from app.models.complaint import Complaint, ComplaintSupport, ComplaintDuplicate
+from app.models.complaint import (
+    Complaint, 
+    ComplaintSupport, 
+    ComplaintDuplicate,
+    ComplaintLike,
+    ComplaintComment,
+    ComplaintFeedback
+)
 from app.models.campus import Room, Category
 from app.models.history import ComplaintStatusHistory
 from app.services.duplicate_detector import DuplicateDetector
@@ -340,3 +347,255 @@ def get_complaint_history(id):
 
     history = [h.to_dict() for h in complaint.status_history.order_by('created_at').all()]
     return jsonify({'history': history}), 200
+
+# ==================== NEW FEATURES: LIKES, COMMENTS, PUBLIC FEED, FEEDBACK, ISSUE TRACKER ====================
+
+@complaints_bp.route('/<id>/like', methods=['POST'])
+@jwt_required_custom
+def toggle_like(id):
+    """
+    Toggle like/heart on an issue in the X-style public feed.
+    """
+    current_user = g.current_user
+    complaint = Complaint.query.get(id)
+    if not complaint:
+        return jsonify({'error': 'Not Found', 'message': 'Complaint not found.'}), 404
+
+    existing_like = ComplaintLike.query.filter_by(complaint_id=complaint.id, user_id=current_user.id).first()
+    if existing_like:
+        db.session.delete(existing_like)
+        db.session.commit()
+        liked = False
+    else:
+        new_like = ComplaintLike(complaint_id=complaint.id, user_id=current_user.id)
+        db.session.add(new_like)
+        db.session.commit()
+        liked = True
+
+    return jsonify({
+        'liked': liked,
+        'likes_count': complaint.likes.count(),
+        'complaint_id': complaint.id
+    }), 200
+
+@complaints_bp.route('/<id>/comments', methods=['GET'])
+@jwt_required_custom
+def get_comments(id):
+    complaint = Complaint.query.get(id)
+    if not complaint:
+        return jsonify({'error': 'Not Found', 'message': 'Complaint not found.'}), 404
+
+    comments = complaint.comments.order_by(ComplaintComment.created_at.asc()).all()
+    return jsonify({
+        'count': len(comments),
+        'comments': [c.to_dict() for c in comments]
+    }), 200
+
+@complaints_bp.route('/<id>/comments', methods=['POST'])
+@jwt_required_custom
+def add_comment(id):
+    current_user = g.current_user
+    complaint = Complaint.query.get(id)
+    if not complaint:
+        return jsonify({'error': 'Not Found', 'message': 'Complaint not found.'}), 404
+
+    data = request.get_json() or {}
+    text = sanitize_string(data.get('comment_text', ''), 1000)
+    if not text:
+        return jsonify({'error': 'Validation Error', 'message': 'Comment text cannot be empty.'}), 400
+
+    new_comment = ComplaintComment(
+        complaint_id=complaint.id,
+        user_id=current_user.id,
+        comment_text=text
+    )
+    db.session.add(new_comment)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Comment posted successfully.',
+        'comment': new_comment.to_dict(),
+        'comments_count': complaint.comments.count()
+    }), 201
+
+@complaints_bp.route('/<id>/feedback', methods=['POST'])
+@jwt_required_custom
+def submit_feedback(id):
+    """
+    Public feedback for solved/completed issues.
+    Users can submit a 1-5 star rating and comment on the resolution.
+    """
+    current_user = g.current_user
+    complaint = Complaint.query.get(id)
+    if not complaint:
+        return jsonify({'error': 'Not Found', 'message': 'Complaint not found.'}), 404
+
+    data = request.get_json() or {}
+    try:
+        rating = int(data.get('rating', 5))
+        if not (1 <= rating <= 5):
+            raise ValueError()
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Validation Error', 'message': 'Rating must be an integer between 1 and 5.'}), 400
+
+    comment = sanitize_string(data.get('comment', ''), 1000)
+
+    # Check if this user already submitted feedback on this complaint; if so, update it
+    feedback = ComplaintFeedback.query.filter_by(complaint_id=complaint.id, user_id=current_user.id).first()
+    if feedback:
+        feedback.rating = rating
+        feedback.comment = comment
+        feedback.created_at = datetime.utcnow()
+    else:
+        feedback = ComplaintFeedback(
+            complaint_id=complaint.id,
+            user_id=current_user.id,
+            rating=rating,
+            comment=comment
+        )
+        db.session.add(feedback)
+
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Thank you! Your feedback has been published.',
+        'feedback': feedback.to_dict(),
+        'complaint': complaint.to_dict(include_details=True, current_user_id=current_user.id)
+    }), 200
+
+@complaints_bp.route('/feedback', methods=['GET'])
+@jwt_required_custom
+def get_public_feedback():
+    """
+    Returns all public feedback on solved complaints across campus.
+    """
+    feedbacks = ComplaintFeedback.query.order_by(ComplaintFeedback.created_at.desc()).all()
+    all_ratings = [f.rating for f in feedbacks]
+    avg_rating = round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 5.0
+
+    # Also include recently resolved complaints available for review
+    resolved_complaints = Complaint.query.filter_by(status='resolved').order_by(Complaint.resolved_at.desc()).limit(15).all()
+
+    rating_dist = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+    for r in all_ratings:
+        rating_dist[r] = rating_dist.get(r, 0) + 1
+
+    return jsonify({
+        'feedbacks': [f.to_dict() for f in feedbacks],
+        'total_feedbacks': len(feedbacks),
+        'average_rating': avg_rating,
+        'rating_distribution': rating_dist,
+        'resolved_complaints': [c.to_dict(include_details=True, current_user_id=g.current_user.id) for c in resolved_complaints]
+    }), 200
+
+@complaints_bp.route('/public-feed', methods=['GET'])
+@jwt_required_custom
+def get_public_feed():
+    """
+    Modern X (Twitter)-style public feed of all campus issues and resolutions.
+    Tabs: 'all', 'trending', 'resolved', 'my_reports'
+    """
+    current_user = g.current_user
+    tab = request.args.get('tab', 'all')
+    search = request.args.get('search', '').strip()
+
+    query = Complaint.query
+
+    if tab == 'resolved':
+        query = query.filter_by(status='resolved')
+    elif tab == 'trending':
+        # Issues with highest priority or most affected users/supporters
+        query = query.filter(Complaint.status != 'resolved').order_by(
+            db.desc(Complaint.priority_score),
+            db.desc(Complaint.affected_users_count)
+        )
+    elif tab == 'my_reports':
+        query = query.filter_by(student_id=current_user.id)
+    
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            db.or_(
+                Complaint.title.ilike(search_filter),
+                Complaint.description.ilike(search_filter),
+                Complaint.complaint_number.ilike(search_filter)
+            )
+        )
+
+    if tab != 'trending':
+        query = query.order_by(Complaint.created_at.desc())
+
+    complaints = query.all()
+
+    # Recalculate dynamic priority
+    for c in complaints:
+        if c.status not in ['resolved']:
+            PriorityEngine.update_complaint_priority(c)
+    db.session.commit()
+
+    return jsonify({
+        'tab': tab,
+        'count': len(complaints),
+        'feed': [c.to_dict(include_details=True, current_user_id=current_user.id) for c in complaints]
+    }), 200
+
+@complaints_bp.route('/tracker', methods=['GET'])
+@jwt_required_custom
+def get_issue_tracker():
+    """
+    Dedicated progress tracker for issues reported by the user.
+    Returns step-by-step lifecycle progress (Submitted -> Acknowledged -> Assigned -> In Progress -> Resolved).
+    """
+    current_user = g.current_user
+    complaints = Complaint.query.filter_by(student_id=current_user.id).order_by(Complaint.created_at.desc()).all()
+
+    step_definitions = [
+        {'key': 'submitted', 'label': 'Report Submitted', 'desc': 'Issue recorded and duplicate verification complete.'},
+        {'key': 'acknowledged', 'label': 'Reviewed & Acknowledged', 'desc': 'Administrative team has reviewed and verified the priority score.'},
+        {'key': 'assigned', 'label': 'Staff Assigned', 'desc': 'Maintenance technician has been dispatched with work instructions.'},
+        {'key': 'in_progress', 'label': 'Work In Progress', 'desc': 'Technician is actively working on-site to inspect and repair.'},
+        {'key': 'resolved', 'label': 'Issue Resolved', 'desc': 'Repairs finished, restoration notes & photos verified.'}
+    ]
+
+    status_to_step_index = {
+        'submitted': 1,
+        'acknowledged': 2,
+        'assigned': 3,
+        'in_progress': 4,
+        'resolved': 5,
+        'reopened': 4  # if reopened, in active progress
+    }
+
+    tracker_items = []
+    for c in complaints:
+        step_idx = status_to_step_index.get(c.status, 1)
+        percentage = int((step_idx / 5.0) * 100)
+
+        steps = []
+        for i, sdef in enumerate(step_definitions, 1):
+            is_completed = i <= step_idx
+            is_active = i == step_idx
+            steps.append({
+                'step_number': i,
+                'key': sdef['key'],
+                'label': sdef['label'],
+                'description': sdef['desc'],
+                'completed': is_completed,
+                'current': is_active
+            })
+
+        c_dict = c.to_dict(include_details=True, current_user_id=current_user.id)
+        c_dict['tracking'] = {
+            'current_step': step_idx,
+            'total_steps': 5,
+            'progress_percentage': percentage,
+            'is_resolved': c.status == 'resolved',
+            'is_reopened': c.is_reopened,
+            'steps': steps
+        }
+        tracker_items.append(c_dict)
+
+    return jsonify({
+        'count': len(tracker_items),
+        'items': tracker_items
+    }), 200

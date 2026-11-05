@@ -13,6 +13,11 @@ export const authService = {
     return api.get('/auth/me');
   },
 
+  updateProfile: async (formData) => {
+    // Can be FormData (with avatar) or JSON
+    return api.patch('/auth/profile', formData);
+  },
+
   logout: async () => {
     try {
       await api.post('/auth/logout', {});

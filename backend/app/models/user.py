@@ -14,6 +14,8 @@ class User(db.Model):
     phone = db.Column(db.String(20), nullable=True)
     department = db.Column(db.String(100), nullable=True)
     specialization = db.Column(db.String(100), nullable=True)  # For staff e.g. Electrical, Plumbing
+    avatar_url = db.Column(db.Text, nullable=True)
+    bio = db.Column(db.Text, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -38,6 +40,8 @@ class User(db.Model):
             'phone': self.phone,
             'department': self.department,
             'specialization': self.specialization,
+            'avatar_url': self.avatar_url,
+            'bio': self.bio,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

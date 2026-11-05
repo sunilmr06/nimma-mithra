@@ -52,6 +52,11 @@ export const AuthProvider = ({ children }) => {
     return res.user;
   };
 
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('campuscare_user', JSON.stringify(updatedUser));
+  };
+
   const logout = () => {
     authService.logout();
     setUser(null);
@@ -70,6 +75,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         register,
+        updateUser,
         logout,
       }}
     >

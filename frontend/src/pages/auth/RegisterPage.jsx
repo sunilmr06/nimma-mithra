@@ -50,10 +50,10 @@ const RegisterPage = () => {
             <ShieldCheck className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-main tracking-tight">
-            Student Registration
+            Nimma <span className="text-cyan">Mithra</span>
           </h1>
           <p className="text-xs text-muted mt-1">
-            Join CampusCare to report and track campus maintenance issues
+            Student Registration — Report, track, and resolve campus issues
           </p>
         </div>
 

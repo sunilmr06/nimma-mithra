@@ -11,7 +11,14 @@ from app import create_app
 from app.extensions import db
 from app.models.user import User
 from app.models.campus import Building, Floor, Room, Category
-from app.models.complaint import Complaint, ComplaintSupport, ComplaintDuplicate
+from app.models.complaint import (
+    Complaint, 
+    ComplaintSupport, 
+    ComplaintDuplicate,
+    ComplaintLike,
+    ComplaintComment,
+    ComplaintFeedback
+)
 from app.models.assignment import ComplaintAssignment
 from app.models.history import ComplaintStatusHistory, ComplaintResolution, Notification
 from app.services.priority_engine import PriorityEngine
@@ -26,6 +33,9 @@ def seed_database():
         # Check if already seeded
         if User.query.filter_by(email='admin@campuscare.edu').first():
             print("Database already seeded. Cleaning and reseeding for pristine demo state...")
+            ComplaintFeedback.query.delete()
+            ComplaintComment.query.delete()
+            ComplaintLike.query.delete()
             Notification.query.delete()
             ComplaintResolution.query.delete()
             ComplaintStatusHistory.query.delete()
@@ -365,6 +375,45 @@ def seed_database():
             created_at=c4_time + timedelta(hours=18)
         )
         db.session.add_all([h4_1, h4_2])
+
+        print("Seeding Likes, Comments & Public Feedback...")
+        # Likes on c1 (Projector) and c3 (Electrical)
+        like1 = ComplaintLike(complaint_id=c1.id, user_id=student_priya.id)
+        like2 = ComplaintLike(complaint_id=c1.id, user_id=student_rahul.id)
+        like3 = ComplaintLike(complaint_id=c3.id, user_id=student_alex.id)
+        db.session.add_all([like1, like2, like3])
+
+        # Comments on c1 (Projector issue discussion)
+        comm1 = ComplaintComment(
+            complaint_id=c1.id,
+            user_id=student_priya.id,
+            comment_text="Our group had a presentation today at 10 AM and had to move to another room because the HDMI output gave no signal.",
+            created_at=c1_time + timedelta(hours=3)
+        )
+        comm2 = ComplaintComment(
+            complaint_id=c1.id,
+            user_id=student_rahul.id,
+            comment_text="I verified the projector power cord too, lamp error LED is blinking orange.",
+            created_at=c1_time + timedelta(hours=5)
+        )
+        db.session.add_all([comm1, comm2])
+
+        # Public Feedback on resolved issue c4
+        fb1 = ComplaintFeedback(
+            complaint_id=c4.id,
+            user_id=student_alex.id,
+            rating=5,
+            comment="Super fast response! Vikram replaced the wheels within a few hours and the chair rolls smoothly now. Great job!",
+            created_at=c4_time + timedelta(hours=20)
+        )
+        fb2 = ComplaintFeedback(
+            complaint_id=c4.id,
+            user_id=student_priya.id,
+            rating=5,
+            comment="Verified in Room 104 study carrel. Much appreciated!",
+            created_at=c4_time + timedelta(hours=22)
+        )
+        db.session.add_all([fb1, fb2])
 
         db.session.commit()
         print("Database seeded successfully with Demo Scenario data!")

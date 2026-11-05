@@ -55,10 +55,10 @@ const LoginPage = () => {
             <ShieldCheck className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-2xl font-extrabold text-main tracking-tight">
-            Campus<span className="text-cyan">Care</span>
+            Nimma <span className="text-cyan">Mithra</span>
           </h1>
           <p className="text-xs text-muted mt-1">
-            Smart Campus Maintenance & Intelligent Complaint Resolution
+            ನಿಮ್ಮ ಮಿತ್ರ — Smart Campus Maintenance & Intelligent Issue Tracker
           </p>
         </div>
 
@@ -149,7 +149,7 @@ const LoginPage = () => {
             loading={loading}
             className="w-full mt-2"
           >
-            Sign In to CampusCare
+            Sign In to Nimma Mithra
           </Button>
         </form>
 

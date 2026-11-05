@@ -262,5 +262,105 @@ class CampusCareE2ETestCase(unittest.TestCase):
         self.assertEqual(reopen_res.get_json()['complaint']['status'], 'reopened')
         self.assertTrue(reopen_res.get_json()['complaint']['is_reopened'])
 
+    def test_11_profile_update(self):
+        login_res = self.client.post('/api/v1/auth/login', json={
+            'email': 'alex.student@campuscare.edu',
+            'password': 'Student@123'
+        })
+        token = login_res.get_json()['access_token']
+        headers = {'Authorization': f'Bearer {token}'}
+
+        res = self.client.patch('/api/v1/auth/profile', headers=headers, json={
+            'name': 'Alex Mercer Updated',
+            'phone': '+1 (555) 999-8888',
+            'bio': 'Passionate builder & student leader',
+            'department': 'Computer Science & AI'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertEqual(data['user']['name'], 'Alex Mercer Updated')
+        self.assertEqual(data['user']['bio'], 'Passionate builder & student leader')
+
+    def test_12_likes_and_comments(self):
+        login_res = self.client.post('/api/v1/auth/login', json={
+            'email': 'priya.student@campuscare.edu',
+            'password': 'Student@123'
+        })
+        token = login_res.get_json()['access_token']
+        headers = {'Authorization': f'Bearer {token}'}
+
+        with self.app.app_context():
+            c1 = Complaint.query.filter_by(complaint_number='CC-2026-0001').first()
+            c1_id = c1.id
+
+        # Toggle like
+        like_res = self.client.post(f'/api/v1/complaints/{c1_id}/like', headers=headers)
+        self.assertEqual(like_res.status_code, 200)
+        self.assertIn('liked', like_res.get_json())
+        self.assertIn('likes_count', like_res.get_json())
+
+        # Post comment
+        comm_res = self.client.post(f'/api/v1/complaints/{c1_id}/comments', headers=headers, json={
+            'comment_text': 'I spoke with the IT lab admin, replacement bulb is on order.'
+        })
+        self.assertEqual(comm_res.status_code, 201)
+        self.assertIn('comment', comm_res.get_json())
+
+        # Get comments
+        get_comm = self.client.get(f'/api/v1/complaints/{c1_id}/comments', headers=headers)
+        self.assertEqual(get_comm.status_code, 200)
+        self.assertTrue(len(get_comm.get_json()['comments']) > 0)
+
+    def test_13_public_feedback(self):
+        login_res = self.client.post('/api/v1/auth/login', json={
+            'email': 'alex.student@campuscare.edu',
+            'password': 'Student@123'
+        })
+        token = login_res.get_json()['access_token']
+        headers = {'Authorization': f'Bearer {token}'}
+
+        with self.app.app_context():
+            c2 = Complaint.query.filter_by(complaint_number='CC-2026-0002').first()
+            c2_id = c2.id
+
+        # Submit feedback
+        fb_res = self.client.post(f'/api/v1/complaints/{c2_id}/feedback', headers=headers, json={
+            'rating': 5,
+            'comment': 'Suresh arrived quickly and fixed the pipe leakage without mess. Excellent service!'
+        })
+        self.assertEqual(fb_res.status_code, 200)
+        self.assertEqual(fb_res.get_json()['feedback']['rating'], 5)
+
+        # Get public feedback overview
+        get_fb = self.client.get('/api/v1/complaints/feedback', headers=headers)
+        self.assertEqual(get_fb.status_code, 200)
+        self.assertTrue(get_fb.get_json()['total_feedbacks'] > 0)
+        self.assertGreaterEqual(get_fb.get_json()['average_rating'], 1.0)
+
+    def test_14_issue_tracker_and_public_feed(self):
+        login_res = self.client.post('/api/v1/auth/login', json={
+            'email': 'alex.student@campuscare.edu',
+            'password': 'Student@123'
+        })
+        token = login_res.get_json()['access_token']
+        headers = {'Authorization': f'Bearer {token}'}
+
+        # Issue Tracker
+        tr_res = self.client.get('/api/v1/complaints/tracker', headers=headers)
+        self.assertEqual(tr_res.status_code, 200)
+        items = tr_res.get_json()['items']
+        self.assertTrue(len(items) > 0)
+        self.assertIn('tracking', items[0])
+        self.assertIn('current_step', items[0]['tracking'])
+        self.assertIn('progress_percentage', items[0]['tracking'])
+
+        # Public Feed
+        feed_res = self.client.get('/api/v1/complaints/public-feed?tab=all', headers=headers)
+        self.assertEqual(feed_res.status_code, 200)
+        feed_items = feed_res.get_json()['feed']
+        self.assertTrue(len(feed_items) > 0)
+        self.assertIn('likes_count', feed_items[0])
+        self.assertIn('comments_count', feed_items[0])
+
 if __name__ == '__main__':
     unittest.main()

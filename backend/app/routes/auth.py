@@ -81,6 +81,45 @@ def login():
 def get_current_user():
     return jsonify({'user': g.current_user.to_dict()}), 200
 
+@auth_bp.route('/profile', methods=['PATCH', 'PUT'])
+@jwt_required_custom
+def update_profile():
+    """
+    Update profile details: name, phone, department, bio, and profile picture avatar.
+    """
+    user = g.current_user
+    
+    if request.is_json:
+        data = request.get_json() or {}
+        avatar_url = data.get('avatar_url')
+    else:
+        data = request.form.to_dict()
+        avatar_file = request.files.get('avatar') or request.files.get('profile_picture')
+        avatar_url = data.get('avatar_url')
+        if avatar_file:
+            from app.services.storage_service import StorageService
+            try:
+                avatar_url = StorageService.upload_image(avatar_file, folder="avatars")
+            except Exception as e:
+                return jsonify({'error': 'Upload Error', 'message': str(e)}), 400
+
+    if 'name' in data and data['name']:
+        user.name = sanitize_string(data['name'], 100)
+    if 'phone' in data:
+        user.phone = sanitize_string(data['phone'], 20)
+    if 'department' in data:
+        user.department = sanitize_string(data['department'], 100)
+    if 'bio' in data:
+        user.bio = sanitize_string(data['bio'], 500)
+    if avatar_url:
+        user.avatar_url = avatar_url
+
+    db.session.commit()
+    return jsonify({
+        'message': 'Profile updated successfully.',
+        'user': user.to_dict()
+    }), 200
+
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     # Client will clear stored token

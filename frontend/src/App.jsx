@@ -11,12 +11,18 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import NotFoundPage from './pages/NotFoundPage';
 
-// Student Pages
+// Common / Profile Pages
+import ProfilePage from './pages/common/ProfilePage';
+
+// Student / Feature Pages
 import StudentDashboard from './pages/student/StudentDashboard';
 import SubmitComplaintPage from './pages/student/SubmitComplaintPage';
 import MyComplaintsPage from './pages/student/MyComplaintsPage';
 import CampusComplaintsPage from './pages/student/CampusComplaintsPage';
 import ComplaintDetailPage from './pages/student/ComplaintDetailPage';
+import IssueTrackerPage from './pages/student/IssueTrackerPage';
+import PublicFeedPage from './pages/student/PublicFeedPage';
+import PublicFeedbackPage from './pages/student/PublicFeedbackPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -45,7 +51,6 @@ const ProtectedRoute = ({ allowedRoles = [], children }) => {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
-    // Redirect to user's rightful dashboard
     if (role === 'admin') return <Navigate to="/admin" replace />;
     if (role === 'staff') return <Navigate to="/staff" replace />;
     return <Navigate to="/student" replace />;
@@ -61,7 +66,7 @@ const RootRedirect = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-xs text-muted">
-        Loading CampusCare...
+        Loading Nimma Mithra...
       </div>
     );
   }
@@ -88,12 +93,62 @@ function App() {
             {/* Root Route */}
             <Route path="/" element={<RootRedirect />} />
 
+            {/* Common Shared Routes */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute allowedRoles={['student', 'admin', 'staff']}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/feed"
+              element={
+                <ProtectedRoute allowedRoles={['student', 'admin', 'staff']}>
+                  <PublicFeedPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feed"
+              element={
+                <ProtectedRoute allowedRoles={['student', 'admin', 'staff']}>
+                  <PublicFeedPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/feedback"
+              element={
+                <ProtectedRoute allowedRoles={['student', 'admin', 'staff']}>
+                  <PublicFeedbackPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feedback"
+              element={
+                <ProtectedRoute allowedRoles={['student', 'admin', 'staff']}>
+                  <PublicFeedbackPage />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Student Protected Routes */}
             <Route
               path="/student"
               element={
                 <ProtectedRoute allowedRoles={['student']}>
                   <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/tracker"
+              element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <IssueTrackerPage />
                 </ProtectedRoute>
               }
             />
