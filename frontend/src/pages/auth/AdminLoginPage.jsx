@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
-import { ShieldCheck, Lock, Eye, EyeOff, Sparkles, Mail, KeyRound, ArrowLeft } from 'lucide-react';
+import { Lock, Eye, EyeOff, Mail, KeyRound, ArrowLeft } from 'lucide-react';
 
 const AdminLoginPage = () => {
   const [email, setEmail] = useState('');
@@ -34,11 +34,6 @@ const AdminLoginPage = () => {
     }
   };
 
-  const handleQuickDemo = () => {
-    setEmail('admin@campuscare.edu');
-    setPassword('Admin@123');
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
       {/* Background ambient glow circles with Admin primary/indigo shade */}
@@ -63,22 +58,6 @@ const AdminLoginPage = () => {
           </p>
         </div>
 
-        {/* Demo Account Quick-Fill Pill for Admin */}
-        <div className="mb-6 p-3 rounded-xl bg-elevated border border-primary/20">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary-light mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Administrator Demo Credentials (1-Click)</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleQuickDemo}
-            className="w-full px-3 py-2 rounded-lg bg-card hover:bg-primary/20 hover:text-primary-light border border-border text-xs font-semibold text-main transition-colors flex items-center justify-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4 text-primary-light" />
-            <span>Dr. Sarah Mitchell (admin@campuscare.edu)</span>
-          </button>
-        </div>
-
         {/* Admin Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -93,7 +72,7 @@ const AdminLoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@campuscare.edu"
+                placeholder="admin@techfusion.com"
                 required
                 className="w-full bg-elevated border border-border rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-main placeholder-muted focus:outline-none focus:border-primary transition-colors"
               />

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/common/Button';
-import { ShieldCheck, Eye, EyeOff, Sparkles, Wrench, GraduationCap, Lock, Mail } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -37,11 +37,6 @@ const LoginPage = () => {
     }
   };
 
-  const handleQuickDemo = (demoEmail, demoPass) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 relative overflow-hidden">
       {/* Background ambient glow circles */}
@@ -62,32 +57,6 @@ const LoginPage = () => {
           </p>
         </div>
 
-        {/* Demo Account Quick-Fill Pills (Staff & Student Only) */}
-        <div className="mb-6 p-3 rounded-xl bg-elevated border border-border/80">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted mb-2">
-            <Sparkles className="w-3.5 h-3.5 text-cyan" />
-            <span>Instant Demo Fill (1-Click)</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('rajesh.electrician@campuscare.edu', 'Staff@123')}
-              className="px-2.5 py-2 rounded-lg bg-card hover:bg-cyan/20 hover:text-cyan-light border border-border text-[11px] font-semibold text-main transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Wrench className="w-3.5 h-3.5 text-cyan" />
-              Staff (Rajesh)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickDemo('alex.student@campuscare.edu', 'Student@123')}
-              className="px-2.5 py-2 rounded-lg bg-card hover:bg-emerald-500/20 hover:text-emerald-300 border border-border text-[11px] font-semibold text-main transition-colors flex items-center justify-center gap-1.5"
-            >
-              <GraduationCap className="w-3.5 h-3.5 text-emerald-400" />
-              Student (Alex)
-            </button>
-          </div>
-        </div>
-
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -102,7 +71,7 @@ const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@campuscare.edu"
+                placeholder="you@techfusion.com"
                 required
                 className="w-full bg-elevated border border-border rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-main placeholder-muted focus:outline-none focus:border-primary transition-colors"
               />
