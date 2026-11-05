@@ -143,7 +143,7 @@ This guide covers deploying **Nimma Mithra** (Smart Campus Maintenance Managemen
 
 ## Production FAQ & Troubleshooting
 
-### 1. Render Free Tier Spin-Down
+### 1. Ralway Free Tier Spin-Down
 Render's free tier spins down inactive web services after 15 minutes of inactivity. When a new request arrives, it may take 20–40 seconds to spin back up (cold start). Subsequent requests respond instantly.
 
 ### 2. SQLAlchemy / psycopg2 URI Format
